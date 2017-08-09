@@ -1,9 +1,20 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import pymc3 as pm
-import numpy as np
 
 from config import getConfig
+
+
+def plotPosterior():
+    global i, trace
+    cmap = plt.get_cmap('hsv')
+    colors = []
+    for i in np.linspace(0.0, 1.0, config['head']):
+        colors.append(cmap(i))
+    for i, (name, trace) in enumerate(traces.iteritems(), 0):
+        plt.hist(trace, label=name, color=colors[i], **config['histParams'])
+
 
 config = getConfig()
 df = pd.read_csv(config['dataPath'])
@@ -12,8 +23,8 @@ dfFiltered = df[df['totalCount'] > config['minSamples']].sort_values('totalCount
     drop=True)
 
 traces = {}
-for i in range(config['head']):
-    appName = dfFiltered['bidRequest:::app:::bundle'].iloc[i]
+for i in range(1, config['head']):
+    appName = dfFiltered.iloc[i]['bidRequest:::app:::bundle']
 
     occurrences = [True] * dfFiltered[config['colNameForTrue']].iloc[i] + [False] * (
         dfFiltered['totalCount'].iloc[i] - dfFiltered[config['colNameForTrue']].iloc[i])
@@ -29,15 +40,11 @@ for i in range(config['head']):
         obs = pm.Bernoulli("obs", p, observed=occurrences)
         step = pm.Metropolis()
         trace = pm.sample(config['mcRuns'], step=step)
-        burned_trace = trace[5000:]
+        burnedTrace = trace[5000:]
 
-    traces[appName] = burned_trace['p']
+    traces[appName] = burnedTrace['p']
 
-cmap = plt.get_cmap('hsv')
-colors = [cmap(i) for i in np.linspace(0., 1., num=config['head'])]
-
-for i, (name, trace) in enumerate(traces.iteritems(), 1):
-    plt.hist(trace, bins=50, alpha=0.5, histtype="stepfilled", normed=True, label=name, color=colors[i])
+plotPosterior()
 
 plt.title("Posterior CTR")
 plt.legend()
